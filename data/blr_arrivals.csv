@@ -1,0 +1,11 @@
+flight_id,callsign,origin_airport,destination_airport,aircraft_type,weight_class,eta_minutes,priority
+1,AI501,DEL,BLR,A320,medium,10,medium
+2,6E202,BOM,BLR,A320,medium,12,medium
+3,UK811,HYD,BLR,A321,medium,14,low
+4,AI505,DXB,BLR,B777,heavy,16,high
+5,6E215,MAA,BLR,A320,medium,18,medium
+6,SG403,CCU,BLR,B737,medium,20,low
+7,AI509,SIN,BLR,B787,heavy,22,high
+8,6E208,GOI,BLR,A320,medium,24,low
+9,UK817,PNQ,BLR,A321,medium,26,medium
+10,AI511,LHR,BLR,B777,heavy,28,high
