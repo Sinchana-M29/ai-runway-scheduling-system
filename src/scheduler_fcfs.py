@@ -1,40 +1,40 @@
 import pandas as pd
-from src.separation_rules import get_separation_time
+from separation_rules import get_separation_time
 
 
-def schedule_fcfs(df):
+def fcfs_schedule(flights):
     """
-    First Come First Serve scheduling with wake turbulence separation.
+    First Come First Serve scheduling with wake turbulence separation
     """
 
-    # sort aircraft by ETA
-    df = df.sort_values(by="eta_minutes").reset_index(drop=True)
+    scheduled_landings = []
+    previous_landing_time = 0
+    previous_wake = None
 
-    landing_times = []
+    for index, flight in flights.iterrows():
 
-    for i in range(len(df)):
+        eta = flight["eta_minutes"]
+        wake_category = flight["wake_category"]
 
-        if i == 0:
-            landing_times.append(df.loc[i, "eta_minutes"])
+        if previous_wake is None:
+            landing_time = eta
         else:
+            separation = get_separation_time(previous_wake, wake_category)
+            landing_time = max(eta, previous_landing_time + separation)
 
-            prev_aircraft = df.loc[i - 1]
-            curr_aircraft = df.loc[i]
+        delay = landing_time - eta
 
-            sep = get_separation_time(
-                prev_aircraft["weight_class"],
-                curr_aircraft["weight_class"]
-            )
+        scheduled_landings.append({
+            "flight_id": flight["flight_id"],
+            "callsign": flight["callsign"],
+            "aircraft_type": flight["aircraft_type"],
+            "wake_category": wake_category,
+            "eta": eta,
+            "scheduled_landing": landing_time,
+            "delay_minutes": delay
+        })
 
-            landing_time = max(
-                curr_aircraft["eta_minutes"],
-                landing_times[i - 1] + sep
-            )
+        previous_landing_time = landing_time
+        previous_wake = wake_category
 
-            landing_times.append(landing_time)
-
-    df["scheduled_landing"] = landing_times
-
-    df["delay"] = df["scheduled_landing"] - df["eta_minutes"]
-
-    return df
+    return pd.DataFrame(scheduled_landings)
