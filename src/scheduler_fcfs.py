@@ -1,5 +1,5 @@
 import pandas as pd
-from separation_rules import get_separation_time
+from src.separation_rules import get_separation_time
 
 
 def fcfs_schedule(flights):
