@@ -1,0 +1,11 @@
+flight_id,aircraft_type,wake_category,eta_minutes,traffic_density,weather_condition,priority,scheduled_landing,delay_minutes
+1,A320,Medium,10,5,clear,medium,10,0
+2,A320,Medium,10.5,6,clear,medium,12,1.5
+3,B737,Medium,11,6,clear,low,14,3
+4,B787,Heavy,11.3,7,rain,high,15,3.7
+5,A321,Medium,12,7,clear,medium,13,1
+6,B737,Medium,12.4,8,clear,low,16,3.6
+7,B777,Heavy,12.7,9,storm,high,19,6.3
+8,A320,Medium,13,8,clear,low,17,4
+9,B737,Medium,13.4,8,clear,medium,20,6.6
+10,A350,Heavy,14,7,fog,high,23,9
