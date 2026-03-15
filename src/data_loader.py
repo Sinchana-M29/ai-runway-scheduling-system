@@ -3,29 +3,29 @@ import pandas as pd
 
 def load_flight_data(file_path):
     """
-    Loads aircraft arrival data from CSV
+    Loads aircraft arrival data and prepares priority sorting
     """
+
     flights = pd.read_csv(file_path)
 
-    # sort flights by ETA
-    flights = flights.sort_values(by="eta_minutes")
+    priority_map = {
+        "high": 1,
+        "medium": 2,
+        "low": 3
+    }
+
+    flights["priority_value"] = flights["priority"].map(priority_map)
+
+    flights = flights.sort_values(by=["priority_value", "eta_minutes"])
 
     return flights
 
 
 def load_weather_data(file_path):
-    """
-    Loads weather conditions dataset
-    """
-    weather = pd.read_csv(file_path)
 
-    return weather
+    return pd.read_csv(file_path)
 
 
 def load_training_data(file_path):
-    """
-    Loads ML training dataset
-    """
-    training_data = pd.read_csv(file_path)
 
-    return training_data
+    return pd.read_csv(file_path)
