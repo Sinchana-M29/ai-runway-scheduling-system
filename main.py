@@ -1,6 +1,6 @@
-from src.data_loader import load_flight_data
 from src.scheduler_fcfs import multi_runway_schedule
 from src.data_generator import generate_flights
+from src.performance_metrics import calculate_metrics
 
 
 def main():
@@ -15,8 +15,14 @@ def main():
 
     schedule.to_csv("data/generated_schedule.csv", index=False)
 
-    print("\nSimulation completed")
-    print("Dataset saved to data/generated_schedule.csv")
+    print("\nSchedule saved to data/generated_schedule.csv")
+
+    metrics = calculate_metrics(schedule)
+
+    print("\n===== PERFORMANCE METRICS =====\n")
+
+    for key, value in metrics.items():
+        print(f"{key}: {value}")
 
 
 if __name__ == "__main__":
