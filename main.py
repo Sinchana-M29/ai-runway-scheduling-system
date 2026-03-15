@@ -1,5 +1,5 @@
 from src.data_loader import load_flight_data
-from src.scheduler_fcfs import fcfs_schedule
+from src.scheduler_fcfs import fcfs_schedule, multi_runway_schedule
 
 
 def main():
@@ -11,7 +11,7 @@ def main():
     print(flights)
 
     # Run FCFS scheduler
-    schedule = fcfs_schedule(flights)
+    schedule = multi_runway_schedule(flights)
 
     print("\nScheduled Landings:\n")
     print(schedule)
