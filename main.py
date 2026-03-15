@@ -1,27 +1,22 @@
 from src.data_loader import load_flight_data
 from src.scheduler_fcfs import multi_runway_schedule
+from src.data_generator import generate_flights
 
 
 def main():
 
-    print("\nLoading flight dataset...\n")
+    print("\nGenerating simulated flight dataset...\n")
 
-    flights = load_flight_data("data/blr_arrivals.csv")
+    flights = generate_flights(300)
 
-    print("Flights Loaded:")
-    print(flights)
-    print("\n-----------------------------------\n")
-
-    print("Running multi-runway scheduler...\n")
+    print("Flights generated:", len(flights))
 
     schedule = multi_runway_schedule(flights)
 
-    print("Final Landing Schedule:\n")
-    print(schedule)
-
     schedule.to_csv("data/generated_schedule.csv", index=False)
 
-    print("\nSchedule saved to: data/generated_schedule.csv\n")
+    print("\nSimulation completed")
+    print("Dataset saved to data/generated_schedule.csv")
 
 
 if __name__ == "__main__":
