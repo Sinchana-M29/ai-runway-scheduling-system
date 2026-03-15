@@ -24,3 +24,18 @@ def get_separation_time(leading, following):
     """
 
     return SEPARATION_MATRIX.get((leading, following), 2)
+
+
+def weather_separation_adjustment(weather_condition):
+    """
+    Returns additional separation time based on weather
+    """
+
+    weather_rules = {
+        "clear": 0,
+        "rain": 1,
+        "storm": 2,
+        "fog": 1
+    }
+
+    return weather_rules.get(weather_condition, 0)
