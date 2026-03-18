@@ -1,4 +1,4 @@
-from src.scheduler_fcfs import multi_runway_schedule
+from src.scheduling.scheduler_fcfs import multi_runway_schedule
 from src.data_generator import generate_flights
 from src.performance_metrics import calculate_metrics
 
