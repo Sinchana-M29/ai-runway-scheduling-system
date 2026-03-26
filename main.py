@@ -1,8 +1,11 @@
+<<<<<<< HEAD
 from scheduling.simulation3d import run_3d_simulation
 from visualization import show_dashboard
 from performance_metrics import calculate_metrics
 from data_generator import generate_flights
 from scheduling.scheduler_fcfs import multi_runway_schedule
+=======
+>>>>>>> origin/scheduling-module
 from src.data_generator import generate_flights
 from src.scheduling.scheduler_fcfs import multi_runway_schedule
 from src.performance_metrics import calculate_metrics
