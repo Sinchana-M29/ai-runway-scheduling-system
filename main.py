@@ -14,31 +14,17 @@ from scheduling.simulation3d import run_3d_simulation
 
 # ===== LINE 12 =====
 def main():
-<<<<<<< HEAD
-    print("\nGenerating simulated flight dataset...\n")
-
-    # ===== LINE 15 ===== GENERATE DATA
-    flights = generate_flights(300)
-    print("Flights generated:", len(flights))
-=======
 
     print("\nGenerating 1000 flight dataset...\n")
 
     flights = generate_flights(1000)
->>>>>>> origin/main
 
     # ===== LINE 19 ===== SCHEDULING
     schedule = multi_runway_schedule(flights)
 
-<<<<<<< HEAD
-    # ===== LINE 22 ===== SAVE FILE
-    schedule.to_csv("data/generated_schedule.csv", index=False)
-    print("\nSchedule saved to data/generated_schedule.csv")
-=======
     schedule.to_csv("data/generated_schedule_1000.csv", index=False)
 
     print("Dataset saved to data/generated_schedule_1000.csv")
->>>>>>> origin/main
 
     # ===== LINE 26 ===== METRICS
     metrics = calculate_metrics(schedule)
