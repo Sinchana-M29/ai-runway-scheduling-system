@@ -1,0 +1,11 @@
+time_slot,wind_speed_knots,visibility_km,precipitation,condition
+10,12,8,0,clear
+11,14,7,0,clear
+12,16,6,1,rain
+13,18,5,1,rain
+14,22,3,2,storm
+15,20,4,1,rain
+16,15,6,0,clear
+17,14,7,0,clear
+18,12,8,0,clear
+19,25,2,2,fog

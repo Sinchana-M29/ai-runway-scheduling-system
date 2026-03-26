@@ -24,3 +24,37 @@ def get_separation_time(leading, following):
     """
 
     return SEPARATION_MATRIX.get((leading, following), 2)
+
+
+def weather_separation_adjustment(weather_condition):
+    """
+    Returns additional separation time based on weather
+    """
+
+    weather_rules = {
+        "clear": 0,
+        "rain": 1,
+        "storm": 2,
+        "fog": 1
+    }
+
+    return weather_rules.get(weather_condition, 0)
+
+
+def runway_occupancy_time(aircraft_type):
+    """
+    Returns runway occupancy time based on aircraft size
+    """
+
+    occupancy_rules = {
+        "A320": 2,
+        "A321": 2,
+        "A319": 2,
+        "B737": 2,
+        "B787": 3,
+        "B777": 3,
+        "A350": 3,
+        "A330": 3
+    }
+
+    return occupancy_rules.get(aircraft_type, 2)

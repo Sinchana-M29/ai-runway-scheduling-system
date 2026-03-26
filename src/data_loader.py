@@ -1,37 +1,31 @@
 import pandas as pd
-import os
 
 
-def load_flight_data():
+def load_flight_data(file_path):
     """
-    Loads the BLR arrivals dataset.
-    """
-
-    file_path = os.path.join("data", "blr_arrivals.csv")
-
-    df = pd.read_csv(file_path)
-
-    return df
-
-
-def validate_dataset(df):
-    """
-    Basic validation to ensure dataset integrity.
+    Loads aircraft arrival data and prepares priority sorting
     """
 
-    required_columns = [
-        "flight_id",
-        "callsign",
-        "origin_airport",
-        "destination_airport",
-        "aircraft_type",
-        "weight_class",
-        "eta_minutes",
-        "priority"
-    ]
+    flights = pd.read_csv(file_path)
 
-    for col in required_columns:
-        if col not in df.columns:
-            raise ValueError(f"Missing column: {col}")
+    priority_map = {
+        "high": 1,
+        "medium": 2,
+        "low": 3
+    }
 
-    return True
+    flights["priority_value"] = flights["priority"].map(priority_map)
+
+    flights = flights.sort_values(by=["priority_value", "eta_minutes"])
+
+    return flights
+
+
+def load_weather_data(file_path):
+
+    return pd.read_csv(file_path)
+
+
+def load_training_data(file_path):
+
+    return pd.read_csv(file_path)

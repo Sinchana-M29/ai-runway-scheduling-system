@@ -1,94 +1,26 @@
-from src.data_loader import load_flight_data, validate_dataset
-from src.scheduler_fcfs import schedule_fcfs
-from src.scheduler_priority import schedule_priority
-from src.scheduler_optimization import schedule_optimized
-from src.visualization import plot_runway_schedule
-from src.runway_simulation import simulate_runway
+from src.data_generator import generate_flights
+from src.scheduling.scheduler_fcfs import multi_runway_schedule
+from src.performance_metrics import calculate_metrics
 
 
 def main():
 
-    # ----------------------------------------
-    # LOAD DATASET
-    # ----------------------------------------
+    print("\nGenerating 1000 flight dataset...\n")
 
-    df = load_flight_data()
+    flights = generate_flights(1000)
 
-    validate_dataset(df)
+    schedule = multi_runway_schedule(flights)
 
-    print("\nFlight Dataset Loaded Successfully\n")
+    schedule.to_csv("data/generated_schedule_1000.csv", index=False)
 
-    # ----------------------------------------
-    # FCFS SCHEDULING
-    # ----------------------------------------
+    print("Dataset saved to data/generated_schedule_1000.csv")
 
-    print("\n========== FCFS Runway Schedule ==========\n")
+    metrics = calculate_metrics(schedule)
 
-    fcfs_df = schedule_fcfs(df)
+    print("\n===== PERFORMANCE METRICS =====\n")
 
-    print(
-        fcfs_df[
-            [
-                "callsign",
-                "aircraft_type",
-                "weight_class",
-                "eta_minutes",
-                "scheduled_landing",
-                "delay",
-            ]
-        ]
-    )
-
-    plot_runway_schedule(fcfs_df)
-
-    # ----------------------------------------
-    # PRIORITY SCHEDULING
-    # ----------------------------------------
-
-    print("\n========== Priority Runway Schedule ==========\n")
-
-    priority_df = schedule_priority(df)
-
-    print(
-        priority_df[
-            [
-                "callsign",
-                "priority",
-                "eta_minutes",
-                "scheduled_landing",
-                "delay",
-            ]
-        ]
-    )
-
-    plot_runway_schedule(priority_df)
-
-    # ----------------------------------------
-    # OPTIMIZED SCHEDULING
-    # ----------------------------------------
-
-    print("\n========== Optimized Runway Schedule ==========\n")
-
-    opt_df = schedule_optimized(df)
-
-    print(
-        opt_df[
-            [
-                "callsign",
-                "eta_minutes",
-                "scheduled_landing",
-                "delay",
-            ]
-        ]
-    )
-
-    plot_runway_schedule(opt_df)
-
-    # ----------------------------------------
-    # RUNWAY SIMULATION
-    # ----------------------------------------
-
-    simulate_runway(opt_df)
+    for key, value in metrics.items():
+        print(f"{key}: {value}")
 
 
 if __name__ == "__main__":
