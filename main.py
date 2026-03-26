@@ -1,12 +1,6 @@
-<<<<<<< HEAD
-# ===== LINE 1 =====
-import sys
-import os
-=======
 from src.data_generator import generate_flights
 from src.scheduling.scheduler_fcfs import multi_runway_schedule
 from src.performance_metrics import calculate_metrics
->>>>>>> origin/main
 
 # ===== LINE 4 =====
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
