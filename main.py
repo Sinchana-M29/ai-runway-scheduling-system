@@ -1,50 +1,32 @@
-<<<<<<< HEAD
-# ===== LINE 1 =====
-import sys
-import os
-=======
+from scheduling.simulation3d import run_3d_simulation
+from visualization import show_dashboard
+from performance_metrics import calculate_metrics
+from data_generator import generate_flights
+from scheduling.scheduler_fcfs import multi_runway_schedule
 from src.data_generator import generate_flights
 from src.scheduling.scheduler_fcfs import multi_runway_schedule
 from src.performance_metrics import calculate_metrics
->>>>>>> origin/main
 
 # ===== LINE 4 =====
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
 # ===== LINE 6 ===== IMPORT MODULES
-from scheduling.scheduler_fcfs import multi_runway_schedule
-from data_generator import generate_flights
-from performance_metrics import calculate_metrics
-from visualization import show_dashboard
-from scheduling.simulation3d import run_3d_simulation
 
 # ===== LINE 12 =====
-def main():
-<<<<<<< HEAD
-    print("\nGenerating simulated flight dataset...\n")
 
-    # ===== LINE 15 ===== GENERATE DATA
-    flights = generate_flights(300)
-    print("Flights generated:", len(flights))
-=======
+
+def main():
 
     print("\nGenerating 1000 flight dataset...\n")
 
     flights = generate_flights(1000)
->>>>>>> origin/main
 
     # ===== LINE 19 ===== SCHEDULING
     schedule = multi_runway_schedule(flights)
 
-<<<<<<< HEAD
-    # ===== LINE 22 ===== SAVE FILE
-    schedule.to_csv("data/generated_schedule.csv", index=False)
-    print("\nSchedule saved to data/generated_schedule.csv")
-=======
     schedule.to_csv("data/generated_schedule_1000.csv", index=False)
 
     print("Dataset saved to data/generated_schedule_1000.csv")
->>>>>>> origin/main
 
     # ===== LINE 26 ===== METRICS
     metrics = calculate_metrics(schedule)
@@ -64,6 +46,7 @@ def main():
 
     # ===== LINE 40 ===== DASHBOARD (OPTIONAL - COMMENT FOR NOW)
     # show_dashboard(schedule)
+
 
 # ===== LINE 44 =====
 if __name__ == "__main__":
