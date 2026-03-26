@@ -1,28 +1,36 @@
 import matplotlib.pyplot as plt
 
+def show_dashboard(schedule):
+    fig, axs = plt.subplots(1, 2, figsize=(12, 5))
 
-def plot_runway_schedule(df):
-    """
-    Creates a runway timeline visualization (Gantt chart).
-    """
+    # =======================
+    # LEFT: RADAR
+    # =======================
+    axs[0].set_facecolor("black")
 
-    plt.figure(figsize=(10, 6))
+    circle = plt.Circle((0, 0), 10, color='green', fill=False)
+    axs[0].add_patch(circle)
 
-    for i, row in df.iterrows():
+    aircrafts = [(2, 3), (-4, 5), (6, -2)]
+    for x, y in aircrafts:
+        axs[0].plot(x, y, "go")
+        axs[0].text(x, y, "✈", color="lime")
 
-        start = row["scheduled_landing"]
-        duration = 1  # aircraft occupies runway briefly
+    axs[0].set_xlim(-10, 10)
+    axs[0].set_ylim(-10, 10)
+    axs[0].set_title("Radar View")
 
-        plt.barh(
-            row["callsign"],
-            duration,
-            left=start
-        )
+    # =======================
+    # RIGHT: DELAY CHART
+    # =======================
+    flights = schedule["callsign"].head(10)
+    delays = schedule["delay_minutes"].head(10)
 
-    plt.xlabel("Time (minutes)")
-    plt.ylabel("Aircraft")
-    plt.title("Runway Landing Schedule")
+    axs[1].bar(flights, delays)
+    axs[1].set_title("Delay Prediction")
+    axs[1].set_xlabel("Flights")
+    axs[1].set_ylabel("Delay (minutes)")
+    axs[1].tick_params(axis='x', rotation=45)
 
-    plt.grid(True)
-
+    plt.tight_layout()
     plt.show()
