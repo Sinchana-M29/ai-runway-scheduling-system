@@ -1,21 +1,19 @@
-from src.scheduler_fcfs import multi_runway_schedule
 from src.data_generator import generate_flights
+from src.scheduling.scheduler_fcfs import multi_runway_schedule
 from src.performance_metrics import calculate_metrics
 
 
 def main():
 
-    print("\nGenerating simulated flight dataset...\n")
+    print("\nGenerating 1000 flight dataset...\n")
 
-    flights = generate_flights(300)
-
-    print("Flights generated:", len(flights))
+    flights = generate_flights(1000)
 
     schedule = multi_runway_schedule(flights)
 
-    schedule.to_csv("data/generated_schedule.csv", index=False)
+    schedule.to_csv("data/generated_schedule_1000.csv", index=False)
 
-    print("\nSchedule saved to data/generated_schedule.csv")
+    print("Dataset saved to data/generated_schedule_1000.csv")
 
     metrics = calculate_metrics(schedule)
 
