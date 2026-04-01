@@ -1,5 +1,5 @@
 import pandas as pd
-from constraints import get_separation_time
+from src.ml.constraints import get_separation_time
 
 
 def initialize_runway_state():

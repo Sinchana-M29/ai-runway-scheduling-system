@@ -1,6 +1,7 @@
 import pandas as pd
-from predict_delay import predict_delay_for_batch
-from runway_allocator import initialize_runway_state, assign_runways, generate_final_output
+from src.ml.predict_delay import predict_delay_for_batch
+from src.ml.runway_allocator import generate_final_output
+from src.ml.rl_scheduler import RunwayRLAgent, initialize_runway_state, rl_schedule_batch
 
 
 def create_batches(df, batch_size=15):
@@ -17,6 +18,7 @@ def create_batches(df, batch_size=15):
 def process_batches_continuously(df, batch_size=15):
     batches = create_batches(df, batch_size=batch_size)
     runway_state = initialize_runway_state()
+    agent = RunwayRLAgent()
     all_final_outputs = []
 
     print(f"Total flights: {len(df)}")
@@ -26,21 +28,18 @@ def process_batches_continuously(df, batch_size=15):
     for idx, batch in enumerate(batches, start=1):
         print(f"Processing Batch {idx} | Size: {len(batch)}")
 
-        # Step 1: predict delay
         predicted_batch = predict_delay_for_batch(batch)
 
-        # Step 2: assign runway with continuity
-        allocated_batch, runway_state = assign_runways(predicted_batch, runway_state)
+        allocated_batch, runway_state = rl_schedule_batch(
+        predicted_batch, agent, runway_state
+        )
 
-        # Step 3: final output format
         final_output_batch = generate_final_output(allocated_batch)
-
-        # Step 4: append
         all_final_outputs.append(final_output_batch)
 
-        # Step 5: continuously save CSV
         running_output = pd.concat(all_final_outputs, ignore_index=True)
         running_output.to_csv("data/continuous_output.csv", index=False)
+        running_output.to_json("data/continuous_output.json", orient="records", indent=2)
 
         print(
             final_output_batch[[
@@ -50,17 +49,11 @@ def process_batches_continuously(df, batch_size=15):
         print("-" * 50)
 
     final_df = pd.concat(all_final_outputs, ignore_index=True)
-
-    # Save final CSV and JSON
-    final_df.to_csv("data/continuous_output.csv", index=False)
-    final_df.to_json("data/continuous_output.json", orient="records", indent=2)
-
     return final_df
 
 
 if __name__ == "__main__":
-    df = pd.read_csv("data/generated_schedule_1000.csv")
-
+    df = pd.read_csv("data/test_schedule.csv")
     final_df = process_batches_continuously(df, batch_size=15)
 
     print("\nContinuous batch processing complete.")
