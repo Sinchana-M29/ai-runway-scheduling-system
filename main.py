@@ -1,6 +1,9 @@
+<<<<<<< HEAD
 import os
 import sys
 
+=======
+>>>>>>> fcf041bc482abebdfebbf78abe54e8996ff46d3f
 from src.data_generator import generate_flights
 from src.scheduling.scheduler_fcfs import multi_runway_schedule
 from src.performance_metrics import calculate_metrics
