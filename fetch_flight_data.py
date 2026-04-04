@@ -1,221 +1,169 @@
+import os
+import time
 import requests
 import pandas as pd
-from datetime import datetime, timedelta, timezone
-import os
+from datetime import datetime, timezone, timedelta
 
-def safe_get(data, *keys, default=None):
-    """Safely get nested dictionary values."""
-    current = data
-    for key in keys:
-        if not isinstance(current, dict):
-            return default
-        current = current.get(key)
-        if current is None:
-            return default
-    return current
+# =========================
+# YOUR CREDENTIALS (TEMP)
+# =========================
+CLIENT_ID = "mansigowda095@gmail.com-api-client"
+CLIENT_SECRET = "OHFDxqSDaToXXDQQEDJZmHM8gduUKyLW"
 
-def parse_datetime(dt_str):
-    """Parse API datetime string safely."""
-    if not dt_str:
-        return None
-    try:
-        return datetime.fromisoformat(dt_str.replace("Z", "+00:00")).astimezone(timezone.utc)
-    except Exception:
-        return None
+# =========================
+# CONFIG
+# =========================
+AIRPORT_ICAO = "VOBL"   # Bangalore airport
+OUTPUT_FILE = "data/converted_real_dataset.csv"
 
-def minutes_from_midnight(dt_obj):
-    """Convert datetime to minutes from midnight."""
-    if dt_obj is None:
-        return 0.0
-    return float(dt_obj.hour * 60 + dt_obj.minute + dt_obj.second / 60)
+TOKEN_URL = "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
+ARRIVAL_URL = "https://opensky-network.org/api/flights/arrival"
+DEPARTURE_URL = "https://opensky-network.org/api/flights/departure"
 
-def infer_wake_category(aircraft_code):
-    """
-    Simple wake category inference.
-    You can improve this later with a better aircraft mapping table.
-    """
-    if not aircraft_code:
-        return "Medium"
+# Fetch last 1 hour (IMPORTANT)
+END_TIME = int(time.time())
+START_TIME = END_TIME - 86400
 
-    code = str(aircraft_code).upper()
+IST = timezone(timedelta(hours=5, minutes=30))
 
-    heavy_list = ["B77", "B78", "B74", "A33", "A34", "A35", "A38", "B767", "B777", "B787", "A330", "A340", "A350", "A380"]
-    light_list = ["C15", "C17", "SR2", "PA2", "DA4", "BE2"]
 
-    if any(x in code for x in heavy_list):
-        return "Heavy"
-    if any(x in code for x in light_list):
-        return "Light"
-    return "Medium"
-
-def infer_weather_condition():
-    """
-    Placeholder because aviationstack flight endpoint does not return weather.
-    Change later if you integrate a weather API.
-    """
-    return "clear"
-
-def infer_traffic_density(total_flights):
-    """
-    Simple traffic density score based on total filtered flights.
-    You can replace this with a better airport congestion calculation later.
-    """
-    if total_flights <= 5:
-        return 2
-    if total_flights <= 10:
-        return 4
-    if total_flights <= 20:
-        return 6
-    return 8
-
-def pick_runway(index):
-    """
-    Placeholder runway assignment for dataset storage.
-    RL scheduler will optimize this later.
-    """
-    return "R1" if index % 2 == 0 else "R2"
-
-def download_flight_schedule():
-    # 1. API details
-    url = "http://api.aviationstack.com/v1/flights"
-    api_key = "c6040a6a1ef1898174e0f8628f5f144f"
-
-    params = {
-        "access_key": api_key,
-        "iata_code": "LHR",
-        "flight_status": "scheduled"
+# =========================
+# STEP 1: GET TOKEN
+# =========================
+def get_token():
+    data = {
+        "grant_type": "client_credentials",
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET
     }
 
-    # 2. Next 1 hour window in UTC
-    now_utc = datetime.now(timezone.utc)
-    next_one_hour_utc = now_utc + timedelta(hours=1)
+    response = requests.post(TOKEN_URL, data=data)
 
-    print(f"Searching flights between {now_utc.isoformat()} and {next_one_hour_utc.isoformat()}")
+    if response.status_code != 200:
+        print("❌ Token error:", response.text)
+        exit()
 
-    try:
-        # 3. Fetch API data
-        response = requests.get(url, params=params, timeout=30)
-        response.raise_for_status()
-        api_data = response.json().get("data", [])
+    return response.json()["access_token"]
 
-        # 4. Filter flights where departure OR arrival scheduled time is in next 1 hour
-        filtered_flights = []
-        for flight in api_data:
-            dep_scheduled_raw = safe_get(flight, "departure", "scheduled")
-            arr_scheduled_raw = safe_get(flight, "arrival", "scheduled")
 
-            dep_dt = parse_datetime(dep_scheduled_raw)
-            arr_dt = parse_datetime(arr_scheduled_raw)
+# =========================
+# STEP 2: FETCH DATA
+# =========================
+def fetch_data(url, token):
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
 
-            dep_in_range = dep_dt is not None and now_utc <= dep_dt <= next_one_hour_utc
-            arr_in_range = arr_dt is not None and now_utc <= arr_dt <= next_one_hour_utc
+    params = {
+        "airport": AIRPORT_ICAO,
+        "begin": START_TIME,
+        "end": END_TIME
+    }
 
-            if dep_in_range or arr_in_range:
-                filtered_flights.append(flight)
+    response = requests.get(url, headers=headers, params=params)
 
-        if not filtered_flights:
-            print("No flights found in the next 1 hour window.")
-            # Still save empty CSV with correct headers
-            empty_df = pd.DataFrame(columns=[
-                "flight_id",
-                "callsign",
-                "aircraft_type",
-                "wake_category",
-                "weather_condition",
-                "traffic_density",
-                "runway",
-                "eta",
-                "scheduled_landing",
-                "ROT",
-                "delay_minutes"
-            ])
-            output_path = os.path.join("data", "converted_real_dataset.csv")
-            empty_df.to_csv(output_path, index=False)
-            print(f"Empty file saved to {output_path}")
-            return
+    if response.status_code == 200:
+        return response.json()
+    elif response.status_code == 404:
+        return []
+    else:
+        print("❌ API error:", response.text)
+        return []
 
-        traffic_density_value = infer_traffic_density(len(filtered_flights))
-        rows = []
 
-        # 5. Convert to same CSV format as your attached file
-        for idx, flight in enumerate(filtered_flights, start=1):
-            flight_id = idx
+# =========================
+# STEP 3: CONVERT TIME
+# =========================
+def convert_time(ts):
+    if ts is None:
+        return ""
+    return datetime.fromtimestamp(ts, tz=IST).strftime("%Y-%m-%d %H:%M:%S")
 
-            callsign = (
-                safe_get(flight, "flight", "iata")
-                or safe_get(flight, "flight", "icao")
-                or safe_get(flight, "airline", "iata")
-                or "UNKNOWN"
-            )
 
-            aircraft_type = (
-                safe_get(flight, "aircraft", "icao24")
-                or safe_get(flight, "aircraft", "registration")
-                or safe_get(flight, "flight", "icao")
-                or "UNKNOWN"
-            )
+# =========================
+# STEP 4: BUILD CSV FORMAT
+# =========================
+def build_rows(arrivals, departures):
+    rows = []
+    flight_id = 1
 
-            wake_category = infer_wake_category(aircraft_type)
-            weather_condition = infer_weather_condition()
-            runway = pick_runway(idx)
+    total = len(arrivals) + len(departures)
 
-            dep_scheduled_raw = safe_get(flight, "departure", "scheduled")
-            arr_scheduled_raw = safe_get(flight, "arrival", "scheduled")
+    if total < 5:
+        density = "Low"
+    elif total < 15:
+        density = "Medium"
+    else:
+        density = "High"
 
-            dep_dt = parse_datetime(dep_scheduled_raw)
-            arr_dt = parse_datetime(arr_scheduled_raw)
+    # ARRIVALS
+    for f in arrivals:
+        ts = f.get("lastSeen")
 
-            # For runway scheduling, prefer arrival as landing time if available
-            # Otherwise fall back to departure
-            eta_dt = arr_dt if arr_dt is not None else dep_dt
-            eta = minutes_from_midnight(eta_dt)
+        rows.append({
+            "flight_id": flight_id,
+            "callsign": (f.get("callsign") or "N/A").strip(),
+            "aircraft_type": "Unknown",
+            "wake_category": "Unknown",
+            "weather_condition": "Clear",
+            "traffic_density": density,
+            "runway": "RWY-09",
+            "eta": convert_time(ts),
+            "scheduled_landing": convert_time(ts),
+            "ROT": 3.0,
+            "delay_minutes": 0.0
+        })
 
-            # Since API doesn't provide actual landing delay/ROT directly here,
-            # we store safe placeholders for now.
-            delay_minutes = 0.0
-            rot = 3.0
+        flight_id += 1
 
-            scheduled_landing = eta + delay_minutes
+    # DEPARTURES
+    for f in departures:
+        ts = f.get("firstSeen")
 
-            rows.append({
-                "flight_id": flight_id,
-                "callsign": callsign,
-                "aircraft_type": aircraft_type,
-                "wake_category": wake_category,
-                "weather_condition": weather_condition,
-                "traffic_density": traffic_density_value,
-                "runway": runway,
-                "eta": eta,
-                "scheduled_landing": scheduled_landing,
-                "ROT": rot,
-                "delay_minutes": delay_minutes
-            })
+        rows.append({
+            "flight_id": flight_id,
+            "callsign": (f.get("callsign") or "N/A").strip(),
+            "aircraft_type": "Unknown",
+            "wake_category": "Unknown",
+            "weather_condition": "Clear",
+            "traffic_density": density,
+            "runway": "RWY-27",
+            "eta": convert_time(ts),
+            "scheduled_landing": convert_time(ts),
+            "ROT": 3.0,
+            "delay_minutes": 0.0
+        })
 
-        # 6. Save to SAME filename
-        df = pd.DataFrame(rows, columns=[
-            "flight_id",
-            "callsign",
-            "aircraft_type",
-            "wake_category",
-            "weather_condition",
-            "traffic_density",
-            "runway",
-            "eta",
-            "scheduled_landing",
-            "ROT",
-            "delay_minutes"
-        ])
+        flight_id += 1
 
-        output_path = os.path.join("data", "converted_real_dataset.csv")
-        df.to_csv(output_path, index=False)
+    return rows
 
-        print(f"Success! Saved {len(df)} flights to {output_path}")
-        print(df.head())
 
-    except requests.exceptions.RequestException as e:
-        print(f"API request error: {e}")
-    except Exception as e:
-        print(f"Unexpected error: {e}")
+# =========================
+# MAIN FUNCTION
+# =========================
+def main():
+    print("🔐 Getting token...")
+    token = get_token()
+
+    print("✈️ Fetching arrivals...")
+    arrivals = fetch_data(ARRIVAL_URL, token)
+
+    print("✈️ Fetching departures...")
+    departures = fetch_data(DEPARTURE_URL, token)
+
+    print(f"Arrivals: {len(arrivals)}, Departures: {len(departures)}")
+
+    rows = build_rows(arrivals, departures)
+
+    df = pd.DataFrame(rows)
+
+    os.makedirs("data", exist_ok=True)
+    df.to_csv(OUTPUT_FILE, index=False)
+
+    print(f"\n✅ Saved to {OUTPUT_FILE}")
+    print(df.head())
+
 
 if __name__ == "__main__":
-    download_flight_schedule()
+    main()

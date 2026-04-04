@@ -1,48 +1,58 @@
-from src.data_generator import generate_flights
+import sys
+import os
+import pandas as pd
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
+
 from src.scheduling.scheduler_fcfs import multi_runway_schedule
 from src.performance_metrics import calculate_metrics
 
-# ===== LINE 4 =====
-sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
-
-# ===== LINE 6 ===== IMPORT MODULES
-
-# ===== LINE 12 =====
-
 
 def main():
+    print("\n📥 Loading real flight dataset...\n")
 
-    print("\nGenerating 1000 flight dataset...\n")
+    flights = pd.read_csv("data/converted_real_dataset.csv")
 
-    flights = generate_flights(1000)
+    print(f"✅ Loaded {len(flights)} flights")
 
-    # ===== LINE 19 ===== SCHEDULING
+    # =========================
+    # FIX COLUMN FORMAT
+    # =========================
+
+    # Convert ETA string to datetime
+    flights["eta"] = pd.to_datetime(flights["eta"], errors="coerce")
+
+    # Fill missing ETA if any
+    flights["eta"] = flights["eta"].ffill()
+    # Create eta_minutes relative to earliest ETA
+    base_time = flights["eta"].min()
+    flights["eta_minutes"] = ((flights["eta"] - base_time).dt.total_seconds() / 60).fillna(0).astype(int)
+    flights = flights.sort_values(by="eta_minutes").reset_index(drop=True)
+   
+    # Ensure ROT is numeric
+    flights["ROT"] = pd.to_numeric(flights["ROT"], errors="coerce").fillna(3.0)
+
+    print("\n✅ Added eta_minutes column")
+    print(flights[["callsign", "eta", "eta_minutes", "ROT"]].head())
+
+    # =========================
+    # SCHEDULING
+    # =========================
     schedule = multi_runway_schedule(flights)
 
-    schedule.to_csv("data/generated_schedule_1000.csv", index=False)
+    schedule.to_csv("data/final_schedule.csv", index=False)
 
-    print("Dataset saved to data/generated_schedule_1000.csv")
+    print("\n✅ Schedule saved to data/final_schedule.csv")
 
-    # ===== LINE 26 ===== METRICS
+    # =========================
+    # METRICS
+    # =========================
     metrics = calculate_metrics(schedule)
 
-    print("\nPerformance Metrics:\n")
+    print("\n📊 Performance Metrics:\n")
     for key, value in metrics.items():
         print(key, ":", value)
 
-    # ===== LINE 32 ===== DEBUG BEFORE 3D
-    print("\n>>> ENTERING 3D SIMULATION <<<\n")
 
-    # ===== LINE 34 ===== RUN 3D
-    run_3d_simulation(schedule)
-
-    # ===== LINE 37 ===== DEBUG AFTER 3D
-    print("\n>>> EXITED 3D SIMULATION <<<\n")
-
-    # ===== LINE 40 ===== DASHBOARD (OPTIONAL - COMMENT FOR NOW)
-    # show_dashboard(schedule)
-
-
-# ===== LINE 44 =====
 if __name__ == "__main__":
     main()
