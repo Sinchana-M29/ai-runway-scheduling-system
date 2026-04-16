@@ -1,22 +1,18 @@
 def calculate_metrics(schedule):
 
-    avg_delay = schedule["delay_minutes"].mean()
-    max_delay = schedule["delay_minutes"].max()
+    print("📊 Calculating metrics...")
 
-    total_aircraft = len(schedule)
-    simulation_time = schedule["scheduled_landing"].max()
+    # =========================
+    # USE PREDICTED DELAY
+    # =========================
+    avg_delay = schedule["predicted_delay"].mean()
 
-    throughput = total_aircraft / simulation_time if simulation_time > 0 else 0
-    runways = schedule["runway"].nunique()
+    max_delay = schedule["predicted_delay"].max()
 
-    utilization = total_aircraft / \
-        (simulation_time * runways) if simulation_time > 0 else 0
+    total_flights = len(schedule)
 
     return {
-        "Average Delay (min)": round(avg_delay, 2),
-        "Max Delay (min)": round(max_delay, 2),
-        "Total Aircraft": total_aircraft,
-        "Simulation Time": round(simulation_time, 2),
-        "Throughput": round(throughput, 3),
-        "Runway Utilization": round(utilization, 3)
+        "Average Delay": round(avg_delay, 2),
+        "Max Delay": round(max_delay, 2),
+        "Total Flights": total_flights
     }

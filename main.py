@@ -1,78 +1,82 @@
-import os
 import sys
+import os
 import pandas as pd
 
+# =========================
+# FIX IMPORT PATH
+# =========================
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
 
-from src.scheduling.scheduler_fcfs import multi_runway_schedule
+# =========================
+# IMPORT MODULES (MATCH YOUR STRUCTURE)
+# =========================
+from src.scheduler_fcfs import multi_runway_schedule
+from src.scheduler_fcfs_basic import fcfs_schedule
 from src.performance_metrics import calculate_metrics
-
-# Optional imports
-try:
-    from src.dashboard.dashboard_app import show_dashboard
-except:
-    show_dashboard = None
-
-try:
-    from src.scheduling.runway_simulation import run_3d_simulation
-except:
-    run_3d_simulation = None
+from src.ml.preprocessing import preprocess_data
 
 
+# =========================
+# MAIN FUNCTION
+# =========================
 def main():
-    print("\n📥 Loading real flight dataset...\n")
+
+    print("\n📥 Loading dataset...\n")
 
     flights = pd.read_csv("data/converted_real_dataset.csv")
+
     print(f"✅ Loaded {len(flights)} flights")
 
-    # Fix ETA column
-    flights["eta"] = pd.to_datetime(flights["eta"], errors="coerce")
-    flights["eta"] = flights["eta"].ffill()
+    # =========================
+    # PREPROCESS
+    # =========================
+    print("\n🔧 Preprocessing dataset...\n")
 
-    # Create eta_minutes
-    base_time = flights["eta"].min()
-    flights["eta_minutes"] = (
-        (flights["eta"] - base_time).dt.total_seconds() / 60
-    ).fillna(0).astype(int)
+    flights = preprocess_data(flights)
 
-    # Sort by ETA
-    flights = flights.sort_values(by="eta_minutes").reset_index(drop=True)
+    print(f"Flights after preprocessing: {len(flights)}")
 
-    # Ensure ROT is numeric
-    flights["ROT"] = pd.to_numeric(flights["ROT"], errors="coerce").fillna(3.0)
+    # =========================
+    # BASIC FCFS
+    # =========================
+    fcfs_result = fcfs_schedule(flights)
 
-    print("\n✅ Added eta_minutes column")
-    print(flights[["callsign", "eta", "eta_minutes", "ROT"]].head())
+    # =========================
+    # ML SCHEDULER
+    # =========================
+    print("\n🛫 Running ML-based runway scheduling...\n")
 
-    # Scheduling
-    schedule = multi_runway_schedule(flights)
+    schedule = multi_runway_schedule(flights, runways=2)
 
-    os.makedirs("data", exist_ok=True)
-    schedule.to_csv("data/final_schedule.csv", index=False)
+    # =========================
+    # METRICS
+    # =========================
+    print("\n📊 Calculating performance metrics...\n")
 
-    print("\n✅ Schedule saved to data/final_schedule.csv")
-
-    # Metrics
     metrics = calculate_metrics(schedule)
 
-    print("\n📊 Performance Metrics:\n")
+    print("\n📈 PERFORMANCE METRICS:")
     for key, value in metrics.items():
         print(f"{key}: {value}")
 
-    # Optional 3D simulation
-    if run_3d_simulation:
-        print("\n>>> ENTERING 3D SIMULATION <<<\n")
-        run_3d_simulation(schedule)
-        print("\n>>> EXITED 3D SIMULATION <<<\n")
-    else:
-        print("\n3D Simulation module not available (skipped)")
+    # =========================
+    # COMPARISON
+    # =========================
+    print("\n📊 COMPARISON:")
 
-    # Optional dashboard
-    if show_dashboard:
-        show_dashboard(schedule)
-    else:
-        print("\nDashboard module not available (skipped)")
+    print("FCFS Avg Landing Time:", round(fcfs_result["landing_time"].mean(), 2))
+    print("ML Avg Landing Time:", round(schedule["landing_time"].mean(), 2))
+
+    # =========================
+    # SAVE OUTPUT
+    # =========================
+    schedule.to_csv("data/final_schedule.csv", index=False)
+
+    print("\n💾 Final schedule saved at: data/final_schedule.csv")
 
 
+# =========================
+# RUN
+# =========================
 if __name__ == "__main__":
     main()

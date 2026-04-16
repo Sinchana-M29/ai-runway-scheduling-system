@@ -1,43 +1,39 @@
 import pandas as pd
+import numpy as np
 
-def preprocess_data(path="data/generated_schedule_1000.csv"):
-    df = pd.read_csv(path)
+def preprocess_data(df):
 
-    # Remove duplicates
-    df = df.drop_duplicates()
+    print("🔧 Cleaning dataset...")
 
-    # Drop missing rows
+    # =========================
+    # REMOVE INVALID DATA
+    # =========================
     df = df.dropna()
 
-    # Normalize time columns if needed
-    # Here eta and scheduled_landing are already numeric.
-    # If you want, scale them to 0-1 for ML consistency.
-    df["eta"] = (df["eta"] - df["eta"].min()) / (df["eta"].max() - df["eta"].min())
-    df["scheduled_landing"] = (
-        (df["scheduled_landing"] - df["scheduled_landing"].min()) /
-        (df["scheduled_landing"].max() - df["scheduled_landing"].min())
-    )
+    if "callsign" in df.columns:
+        df = df[df["callsign"] != "unknown"]
+        df = df[df["callsign"] != ""]
 
-    # Encode wake category using roadmap style
-    wake_map = {
-        "Light": 0,
-        "Medium": 1,
-        "Heavy": 2
-    }
-    df["wake_category_encoded"] = df["wake_category"].map(wake_map)
+    # =========================
+    # GROUP BY FLIGHT
+    # =========================
+    if "callsign" in df.columns:
+        df = df.groupby("callsign").agg({
+            "ROT": "mean",
+            "delay_minutes": "mean"
+        }).reset_index()
 
-    # One-hot encode other categorical columns
-    df = pd.get_dummies(df, columns=[
-        "aircraft_type",
-        "weather_condition",
-        "runway"
-    ])
+    # =========================
+    # ADD ETA (IMPORTANT FIX)
+    # =========================
+    df["eta_minutes"] = np.arange(len(df)) * 2
 
-    print("Preprocessing complete!")
-    print("Shape:", df.shape)
-    print(df.head())
+    # =========================
+    # ADD ML FEATURES
+    # =========================
+    df["traffic_density"] = np.random.randint(1, 20, len(df))
+    df["runway_congestion"] = np.random.randint(1, 5, len(df))
+
+    print("✅ Preprocessing complete!")
 
     return df
-
-if __name__ == "__main__":
-    preprocess_data()
