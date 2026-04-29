@@ -1,30 +1,22 @@
 import pandas as pd
-import numpy as np
 
-df = pd.read_csv("data/converted_real_dataset.csv")
-print("\n📥 Original Shape:", df.shape)
+def clean_data(df):
 
-# clean
-df = df.dropna()
-df = df[df["callsign"] != "unknown"]
+    print("\n🧹 Cleaning dataset...")
 
-print("\n🧹 After cleaning:", df.shape)
+    # basic safety cleaning
+    df = df.copy()
 
-# FIXED GROUPBY (based on your dataset)
-df = df.groupby("callsign").agg({
-    "ROT": "mean",
-    "delay_minutes": "mean"
-}).reset_index()
+    # fill missing values (safe default)
+    df = df.fillna(0)
 
-print("\n📊 After grouping:", df.shape)
+    # ensure correct columns exist
+    if "aircraft_type" not in df.columns:
+        df["aircraft_type"] = "UNKNOWN"
 
-# features
-df["traffic_density"] = np.random.randint(1, 20, len(df))
-df["runway_congestion"] = np.random.randint(1, 5, len(df))
+    if "eta_minutes" not in df.columns:
+        df["eta_minutes"] = 0
 
-print("\n✅ Sample:")
-print(df.head())
+    print(f"\n🧹 After cleaning: {df.shape}")
 
-df.to_csv("data/clean_ml_dataset.csv", index=False)
-
-print("\n🎯 DONE: Clean dataset created!")
+    return df

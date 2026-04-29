@@ -1,82 +1,100 @@
-import sys
-import os
 import pandas as pd
+import sys
 
-# =========================
-# FIX IMPORT PATH
-# =========================
-sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
+from src.data_loader import load_data
+from src.ml.predict import load_model, predict_delay
+from src.scheduling.scheduler_fcfs import multi_runway_schedule
+from src.ml.train_rl import train_rl
 
-# =========================
-# IMPORT MODULES (MATCH YOUR STRUCTURE)
-# =========================
-from src.scheduler_fcfs import multi_runway_schedule
-from src.scheduler_fcfs_basic import fcfs_schedule
-from src.performance_metrics import calculate_metrics
-from src.ml.preprocessing import preprocess_data
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 
-# =========================
-# MAIN FUNCTION
-# =========================
+# -------------------------------
+# 🔧 Convert time → minutes
+# -------------------------------
+def convert_to_minutes(time_val):
+    try:
+        if isinstance(time_val, (int, float)):
+            return int(time_val)
+
+        if ":" in str(time_val):
+            h, m = map(int, str(time_val).split(":"))
+            return h * 60 + m
+
+        return int(time_val)
+    except:
+        return 0
+
+
+# -------------------------------
+# 🔧 Preprocessing
+# -------------------------------
+def preprocess_data(df):
+    print("\n🔧 Standardizing dataset...")
+
+    df["eta_minutes"] = df["arrival_time"].apply(convert_to_minutes)
+
+    print("\n🔍 DATA COLUMNS AFTER STANDARDIZATION:")
+    print(df.columns)
+
+    return df
+
+
+# -------------------------------
+# 🚀 MAIN PIPELINE
+# -------------------------------
 def main():
 
-    print("\n📥 Loading dataset...\n")
+    # -------------------------------
+    # 📥 Load data
+    # -------------------------------
+    print("📥 Loading dataset...")
+    df = load_data("data/final_schedule.csv")
 
-    flights = pd.read_csv("data/converted_real_dataset.csv")
+    print("📊 Shape:", df.shape)
 
-    print(f"✅ Loaded {len(flights)} flights")
+    # -------------------------------
+    # 🔧 Preprocess
+    # -------------------------------
+    df = preprocess_data(df)
 
-    # =========================
-    # PREPROCESS
-    # =========================
-    print("\n🔧 Preprocessing dataset...\n")
+    # -------------------------------
+    # 🧠 ML MODEL
+    # -------------------------------
+    print("\n🧠 Loading ML model...")
+    model = load_model()
 
-    flights = preprocess_data(flights)
+    print("🔮 Predicting delays...")
+    df = predict_delay(model, df)
 
-    print(f"Flights after preprocessing: {len(flights)}")
+    # -------------------------------
+    # 🤖 RL TRAINING
+    # -------------------------------
+    print("\n🤖 Training RL Agent...")
+    rl_agent = train_rl(df, episodes=1)
 
-    # =========================
-    # BASIC FCFS
-    # =========================
-    fcfs_result = fcfs_schedule(flights)
+    # -------------------------------
+    # 🛫 SCHEDULING (RL CONTROLLED)
+    # -------------------------------
+    print("\n🛫 Running Scheduler...")
+    result = multi_runway_schedule(df, rl_agent=rl_agent)
 
-    # =========================
-    # ML SCHEDULER
-    # =========================
-    print("\n🛫 Running ML-based runway scheduling...\n")
+    # -------------------------------
+    # 📊 OUTPUT
+    # -------------------------------
+    print("\n✅ Scheduling completed\n")
+    print(result.head())
 
-    schedule = multi_runway_schedule(flights, runways=2)
-
-    # =========================
-    # METRICS
-    # =========================
-    print("\n📊 Calculating performance metrics...\n")
-
-    metrics = calculate_metrics(schedule)
-
-    print("\n📈 PERFORMANCE METRICS:")
-    for key, value in metrics.items():
-        print(f"{key}: {value}")
-
-    # =========================
-    # COMPARISON
-    # =========================
-    print("\n📊 COMPARISON:")
-
-    print("FCFS Avg Landing Time:", round(fcfs_result["landing_time"].mean(), 2))
-    print("ML Avg Landing Time:", round(schedule["landing_time"].mean(), 2))
-
-    # =========================
-    # SAVE OUTPUT
-    # =========================
-    schedule.to_csv("data/final_schedule.csv", index=False)
-
-    print("\n💾 Final schedule saved at: data/final_schedule.csv")
+    # -------------------------------
+    # 💾 SAVE OUTPUT
+    # -------------------------------
+    result.to_csv("data/output_final.csv", index=False)
+    print("\n💾 Output saved to data/output_final.csv")
 
 
-# =========================
-# RUN
-# =========================
+# -------------------------------
+# ▶️ RUN
+# -------------------------------
 if __name__ == "__main__":
     main()

@@ -1,31 +1,21 @@
 import pandas as pd
+import os
 
 
-def load_flight_data(file_path):
+def load_data(file_path: str) -> pd.DataFrame:
     """
-    Loads aircraft arrival data and prepares priority sorting
+    Loads flight scheduling dataset safely.
+    Supports CSV and checks file existence.
     """
 
-    flights = pd.read_csv(file_path)
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Dataset not found at: {file_path}")
 
-    priority_map = {
-        "high": 1,
-        "medium": 2,
-        "low": 3
-    }
+    try:
+        df = pd.read_csv(file_path)
+        print(f"✅ Data loaded successfully from {file_path}")
+        print(f"📊 Shape: {df.shape}")
+        return df
 
-    flights["priority_value"] = flights["priority"].map(priority_map)
-
-    flights = flights.sort_values(by=["priority_value", "eta_minutes"])
-
-    return flights
-
-
-def load_weather_data(file_path):
-
-    return pd.read_csv(file_path)
-
-
-def load_training_data(file_path):
-
-    return pd.read_csv(file_path)
+    except Exception as e:
+        raise Exception(f"Error reading CSV file: {e}")

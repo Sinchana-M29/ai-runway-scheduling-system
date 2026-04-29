@@ -1,18 +1,13 @@
-def calculate_metrics(schedule):
+def calculate_metrics(df):
 
-    print("📊 Calculating metrics...")
+    if "final_delay" not in df.columns:
+        df["final_delay"] = 0
 
-    # =========================
-    # USE PREDICTED DELAY
-    # =========================
-    avg_delay = schedule["predicted_delay"].mean()
+    avg_delay = df["final_delay"].mean()
+    max_delay = df["final_delay"].max()
+    total = len(df)
 
-    max_delay = schedule["predicted_delay"].max()
-
-    total_flights = len(schedule)
-
-    return {
-        "Average Delay": round(avg_delay, 2),
-        "Max Delay": round(max_delay, 2),
-        "Total Flights": total_flights
-    }
+    print("\n📈 PERFORMANCE METRICS:")
+    print(f"Average Delay: {avg_delay:.2f}")
+    print(f"Max Delay: {max_delay:.2f}")
+    print(f"Total Flights: {total}")

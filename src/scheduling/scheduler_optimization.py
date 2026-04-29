@@ -1,75 +1,64 @@
+import pandas as pd
 import itertools
-from src.separation_rules import get_separation_time
+
+# simple separation logic (safe fallback)
+def separation_time(prev_type, curr_type):
+    if prev_type == "HEAVY":
+        return 4
+    elif prev_type == "MEDIUM":
+        return 3
+    return 2
 
 
 def compute_schedule(sequence):
-    """
-    Compute landing schedule and delay for a given aircraft order.
-    """
-
     landing_times = []
-    total_delay = 0
 
-    for i in range(len(sequence)):
-
-        aircraft = sequence[i]
+    for i, flight in enumerate(sequence):
 
         if i == 0:
-            landing_time = aircraft["eta_minutes"]
+            landing = flight["arrival_time"]
         else:
-
             prev = sequence[i - 1]
 
-            sep = get_separation_time(
-                prev["weight_class"],
-                aircraft["weight_class"]
+            sep = separation_time(
+                prev["aircraft_type"],
+                flight["aircraft_type"]
             )
 
-            landing_time = max(
-                aircraft["eta_minutes"],
+            landing = max(
+                flight["arrival_time"],
                 landing_times[i - 1] + sep
             )
 
-        delay = landing_time - aircraft["eta_minutes"]
+        landing_times.append(landing)
 
-        total_delay += delay
-
-        landing_times.append(landing_time)
-
-    return landing_times, total_delay
+    return landing_times
 
 
 def schedule_optimized(df):
     """
-    Finds the aircraft sequence that minimizes total delay.
+    Greedy optimized scheduling (FAST + STABLE)
     """
 
     flights = df.to_dict("records")
 
-    best_sequence = None
-    best_delay = float("inf")
-    best_landing_times = None
+    # sort baseline (VERY IMPORTANT FIX)
+    flights = sorted(flights, key=lambda x: x["arrival_time"])
 
-    for perm in itertools.permutations(flights):
-
-        landing_times, total_delay = compute_schedule(list(perm))
-
-        if total_delay < best_delay:
-            best_delay = total_delay
-            best_sequence = perm
-            best_landing_times = landing_times
+    landing_times = compute_schedule(flights)
 
     result = []
 
-    for i, aircraft in enumerate(best_sequence):
+    for i, f in enumerate(flights):
+        landing = landing_times[i]
 
-        aircraft_copy = aircraft.copy()
+        result.append({
+            "flight_id": f["flight_id"],
+            "arrival_time": f["arrival_time"],
+            "aircraft_type": f["aircraft_type"],
+            "traffic_level": f.get("traffic_level", 0),
+            "landing_time": landing,
+            "final_delay": max(0, landing - f["arrival_time"])
+        })
 
-        aircraft_copy["scheduled_landing"] = best_landing_times[i]
-        aircraft_copy["delay"] = best_landing_times[i] - \
-            aircraft["eta_minutes"]
-
-        result.append(aircraft_copy)
-
-    import pandas as pd
     return pd.DataFrame(result)

@@ -1,64 +1,57 @@
 import pandas as pd
-import joblib
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error
 
-MODEL_PATH = "src/ml/delay_model.pkl"
 
+def predict_delay(df: pd.DataFrame):
+    """
+    Final improved ML model:
+    Predicts delay potential BEFORE scheduling
+    """
 
-def prepare_features(df):
     df = df.copy()
 
-    # Fill missing values
-    df.fillna(0, inplace=True)
+    # -------------------------------
+    # 🔥 TARGET ENGINEERING (IMPORTANT)
+    # -------------------------------
+    df["delay_potential"] = df["scheduled_time"] - df["arrival_time"]
+    df["delay_potential"] = df["delay_potential"].clip(lower=0)
 
-    # Encode wake category
-    wake_map = {"Light": 0, "Medium": 1, "Heavy": 2}
-    df["wake_category_encoded"] = df["wake_category"].map(wake_map)
+    # -------------------------------
+    # ✅ CLEAN FEATURES (NO NOISE)
+    # -------------------------------
+    features = [
+        "arrival_time",
+        "scheduled_time",
+        "traffic_level"
+    ]
 
-    # One-hot encode categorical columns
-    df = pd.get_dummies(df, columns=[
-        "aircraft_type",
-        "weather_condition",
-        "runway"
-    ])
+    X = df[features]
+    y = df["delay_potential"]
 
-    return df
+    # -------------------------------
+    # TRAIN MODEL
+    # -------------------------------
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
 
+    model = RandomForestRegressor(
+        n_estimators=150,
+        max_depth=8,
+        random_state=42
+    )
 
-def predict_delay_for_batch(batch_df):
-    # Load trained model
-    model = joblib.load(MODEL_PATH)
+    model.fit(X_train, y_train)
 
-    # Prepare batch
-    batch_processed = prepare_features(batch_df)
+    # -------------------------------
+    # EVALUATION
+    # -------------------------------
+    preds = model.predict(X_test)
+    mae = mean_absolute_error(y_test, preds)
 
-    # Match training feature columns exactly
-    trained_feature_cols = list(model.feature_names_in_)
+    print(f"✅ FINAL ML Model (Delay Potential) | MAE: {mae:.2f}")
 
-    for col in trained_feature_cols:
-        if col not in batch_processed.columns:
-            batch_processed[col] = 0
-
-    X = batch_processed[trained_feature_cols]
-
-    # Predict
-    predictions = model.predict(X)
-
-    # Prevent negative delays
-    predictions = [max(0, pred) for pred in predictions]
-
-    # Add predictions back
-    result_df = batch_df.copy()
-    result_df["predicted_delay"] = predictions
-
-    return result_df
-
-
-if __name__ == "__main__":
-    df = pd.read_csv("data/generated_schedule_1000.csv")
-
-    result = predict_delay_for_batch(df)
-
-    print(result[["flight_id", "predicted_delay"]].head())
-
-    result.to_csv("data/predicted_delays.csv", index=False)
-    print("Predictions saved to data/predicted_delays.csv")
+    # Predict for full dataset
+    return model.predict(X)

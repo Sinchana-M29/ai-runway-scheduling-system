@@ -1,114 +1,193 @@
 import numpy as np
-from src.ml.constraints import get_separation_time
+import pandas as pd
+import random
 
 
-class RunwayRLAgent:
-    def __init__(self, alpha=0.1, gamma=0.9, epsilon=0.1):
+class RunwayEnv:
+    def __init__(self, flights_df):
+        # Sort flights by arrival time (VERY IMPORTANT)
+        self.flights = flights_df.sort_values(by="arrival_time").reset_index(drop=True)
+
+        self.n_flights = len(self.flights)
+        self.n_runways = 2
+
+        self.max_delay = 30  # soft cap
+        self.separation_time = 2  # realistic gap (minutes)
+
+        self.reset()
+
+    def reset(self):
+        self.current_index = 0
+
+        # Track runway availability
+        self.runway_available_time = [0 for _ in range(self.n_runways)]
+
+        return self._get_state()
+
+    def _get_state(self):
+        if self.current_index >= self.n_flights:
+            return np.zeros(4)
+
+        flight = self.flights.iloc[self.current_index]
+
+        return np.array([
+            flight["arrival_time"],
+            self.runway_available_time[0],
+            self.runway_available_time[1],
+            self.current_index
+        ])
+
+    def step(self, action):
+        flight = self.flights.iloc[self.current_index]
+
+        runway = action
+
+        arrival_time = flight["arrival_time"]
+        available_time = self.runway_available_time[runway]
+
+        # Assign slot
+        scheduled_time = max(arrival_time, available_time)
+
+        # Calculate delay
+        delay = scheduled_time - arrival_time
+
+        # Soft cap delay
+        delay = min(delay, self.max_delay)
+
+        # Conflict logic (rare now)
+        conflict = delay >= self.max_delay
+
+        # Update runway availability
+        self.runway_available_time[runway] = scheduled_time + self.separation_time
+
+        # Idle time (if runway was free before flight came)
+        idle_time = max(0, arrival_time - available_time)
+
+        # Calculate reward
+        reward = self._calculate_reward(delay, conflict, idle_time)
+
+        # Move forward
+        self.current_index += 1
+        done = self.current_index >= self.n_flights
+
+        next_state = self._get_state()
+
+        return next_state, reward, done, {
+            "delay": delay,
+            "conflict": conflict
+        }
+
+    def _calculate_reward(self, delay, conflict, idle_time):
+        # Normalize delay (prevents huge negative values)
+        delay_penalty = delay / 5
+
+        # Balanced conflict penalty
+        conflict_penalty = 50 if conflict else 0
+
+        # Small idle penalty
+        idle_penalty = idle_time * 0.5
+
+        reward = 0
+
+        # Reward good scheduling
+        if delay < 5:
+            reward += 10
+        elif delay < 10:
+            reward += 5
+
+        if not conflict:
+            reward += 5
+
+        # Final reward
+        reward -= (delay_penalty + conflict_penalty + idle_penalty)
+
+        return reward
+
+
+# ==============================
+# SIMPLE Q-LEARNING AGENT
+# ==============================
+
+class QLearningAgent:
+    def __init__(self, state_size, action_size):
+        self.state_size = state_size
+        self.action_size = action_size
+
         self.q_table = {}
-        self.alpha = alpha
-        self.gamma = gamma
-        self.epsilon = epsilon
 
-    def get_state(self, flight, batch_df, runway_state):
-        return (
-            len(batch_df),
-            int(batch_df["predicted_delay"].mean() // 10),
-            int(runway_state["R1"]["last_time"] // 60),
-            int(runway_state["R2"]["last_time"] // 60),
-            flight["wake_category"]
-        )
+        self.alpha = 0.1
+        self.gamma = 0.95
+        self.epsilon = 1.0
+        self.epsilon_decay = 0.995
+        self.epsilon_min = 0.01
+
+    def _discretize(self, state):
+        return tuple((state // 5).astype(int))
+
+    def get_q(self, state):
+        state = self._discretize(state)
+        if state not in self.q_table:
+            self.q_table[state] = np.zeros(self.action_size)
+        return self.q_table[state]
 
     def choose_action(self, state):
-        if np.random.rand() < self.epsilon:
-            return np.random.choice([0, 1, 2])  # explore
+        if random.uniform(0, 1) < self.epsilon:
+            return random.randint(0, self.action_size - 1)
+        return np.argmax(self.get_q(state))
 
-        if state not in self.q_table:
-            self.q_table[state] = [0, 0, 0]
+    def learn(self, state, action, reward, next_state):
+        state_d = self._discretize(state)
+        next_state_d = self._discretize(next_state)
 
-        return int(np.argmax(self.q_table[state]))
+        if state_d not in self.q_table:
+            self.q_table[state_d] = np.zeros(self.action_size)
 
-    def update_q(self, state, action, reward, next_state):
-        if state not in self.q_table:
-            self.q_table[state] = [0, 0, 0]
-        if next_state not in self.q_table:
-            self.q_table[next_state] = [0, 0, 0]
+        if next_state_d not in self.q_table:
+            self.q_table[next_state_d] = np.zeros(self.action_size)
 
-        old = self.q_table[state][action]
-        next_max = max(self.q_table[next_state])
+        q_predict = self.q_table[state_d][action]
+        q_target = reward + self.gamma * np.max(self.q_table[next_state_d])
 
-        self.q_table[state][action] = old + self.alpha * (
-            reward + self.gamma * next_max - old
-        )
+        self.q_table[state_d][action] += self.alpha * (q_target - q_predict)
 
-
-def initialize_runway_state():
-    return {
-        "R1": {"last_time": 0, "last_wake": None},
-        "R2": {"last_time": 0, "last_wake": None}
-    }
+    def decay_epsilon(self):
+        if self.epsilon > self.epsilon_min:
+            self.epsilon *= self.epsilon_decay
 
 
-def get_time(flight, runway, state):
-    eta = flight["eta"] * 60
-    wake = flight["wake_category"]
+# ==============================
+# TRAINING FUNCTION
+# ==============================
 
-    last_time = state[runway]["last_time"]
-    last_wake = state[runway]["last_wake"]
+def train_rl_agent(flights_df, episodes=300):
+    env = RunwayEnv(flights_df)
+    agent = QLearningAgent(state_size=4, action_size=2)
 
-    if last_wake is None:
-        return eta
+    for ep in range(episodes):
+        state = env.reset()
+        total_reward = 0
 
-    sep = get_separation_time(last_wake, wake)
-    return max(eta, last_time + sep)
+        delays = []
 
+        while True:
+            action = agent.choose_action(state)
+            next_state, reward, done, info = env.step(action)
 
-def rl_schedule_batch(batch_df, agent, runway_state):
-    batch_df = batch_df.copy().reset_index(drop=True)
+            agent.learn(state, action, reward, next_state)
 
-    assigned = []
-    actual_times = []
-    waiting_times = []
+            state = next_state
+            total_reward += reward
+            delays.append(info["delay"])
 
-    i = 0
-    while i < len(batch_df):
-        flight = batch_df.loc[i]
+            if done:
+                break
 
-        state = agent.get_state(flight, batch_df, runway_state)
-        action = agent.choose_action(state)
+        agent.decay_epsilon()
 
-        # 🔹 Action 2 = reorder
-        if action == 2 and i < len(batch_df) - 1:
-            batch_df.iloc[[i, i+1]] = batch_df.iloc[[i+1, i]].values
-            continue  # re-evaluate same index
+        if (ep + 1) % 10 == 0:
+            print(f"\nEpisode {ep+1}")
+            print(f"Reward: {int(total_reward)}")
+            print(f"➡️ Avg Delay: {np.mean(delays):.2f} minutes")
+            print(f"➡️ Max Delay: {np.max(delays)} minutes")
 
-        # 🔹 Action 0 or 1 = runway assignment
-        runway = "R1" if action == 0 else "R2"
-
-        time = get_time(flight, runway, runway_state)
-
-        eta_sec = flight["eta"] * 60
-        sched_sec = flight["scheduled_landing"] * 60
-
-        waiting = time - eta_sec
-        delay = time - sched_sec
-
-        reward = -(waiting + max(0, delay))
-
-        runway_state[runway]["last_time"] = time
-        runway_state[runway]["last_wake"] = flight["wake_category"]
-
-        next_state = agent.get_state(flight, batch_df, runway_state)
-        agent.update_q(state, action, reward, next_state)
-
-        assigned.append(runway)
-        actual_times.append(time)
-        waiting_times.append(waiting)
-
-        i += 1
-
-    batch_df["assigned_runway"] = assigned
-    batch_df["actual_landing_time_sec"] = actual_times
-    batch_df["actual_landing_time_min"] = batch_df["actual_landing_time_sec"] / 60
-    batch_df["waiting_time_sec"] = waiting_times
-
-    return batch_df, runway_state
+    return agent

@@ -1,62 +1,92 @@
-import pandas as pd
-import joblib
+def multi_runway_schedule(flights, num_runways=2, separation=3):
+    """
+    Multi-runway FCFS scheduler with priority + smart runway selection
 
-from src.separation_rules import (
-    get_separation_time,
-    runway_occupancy_time
-)
+    flights: DataFrame with at least:
+        - eta_minutes
+        - traffic_level
+    """
 
-model = joblib.load("src/ml/delay_model.pkl")
+    # -------------------------------
+    # ✅ Safety check
+    # -------------------------------
+    if "eta_minutes" not in flights.columns:
+        raise Exception("❌ 'eta_minutes' column missing. Run preprocessing first.")
 
+    # -------------------------------
+    # 🧠 Priority Mapping
+    # -------------------------------
+    priority_map = {
+        "LOW": 1,
+        "MEDIUM": 2,
+        "HIGH": 3
+    }
 
-def multi_runway_schedule(flights, runways=2):
+    flights["priority"] = flights["traffic_level"].map(priority_map).fillna(1)
 
-    print("\n🧠 Applying ML-based scheduling...\n")
+    # -------------------------------
+    # 📊 Smart Sorting
+    # -------------------------------
+    flights = flights.sort_values(
+        by=["eta_minutes", "priority"],
+        ascending=[True, False]
+    ).copy()
 
-    features = ["ROT", "traffic_density", "runway_congestion"]
+    # -------------------------------
+    # 🛫 Initialize Runways
+    # -------------------------------
+    runway_available_at = [0] * num_runways
 
-    flights["predicted_delay"] = model.predict(flights[features])
-    flights["predicted_delay"] = flights["predicted_delay"].clip(lower=0)
+    assigned_runway = []
+    actual_landing_time = []
+    delay = []
 
-    flights["adjusted_eta"] = flights["eta_minutes"] + flights["predicted_delay"]
+    # -------------------------------
+    # 🚀 Scheduling Logic
+    # -------------------------------
+    for _, row in flights.iterrows():
+        eta = row["eta_minutes"]
 
-    flights = flights.sort_values("adjusted_eta").reset_index(drop=True)
+        # 🧠 Choose best runway (minimizes delay)
+        best_runway = 0
+        best_landing_time = float("inf")
 
-    runway_available_time = [0] * runways
-    previous_wake = [None] * runways
+        for i in range(num_runways):
+            possible_time = max(eta, runway_available_at[i])
 
-    scheduled_landings = []
+            if possible_time < best_landing_time:
+                best_landing_time = possible_time
+                best_runway = i
 
-    for _, flight in flights.iterrows():
+        runway_idx = best_runway
+        landing_time = best_landing_time
 
-        best_runway = None
-        best_time = float("inf")
+        # Calculate delay
+        d = landing_time - eta
 
-        for r in range(runways):
+        # Update runway availability
+        runway_available_at[runway_idx] = landing_time + separation
 
-            separation = 0
-            if previous_wake[r] is not None:
-                separation = get_separation_time(previous_wake[r], "M")
+        # Store results
+        assigned_runway.append(runway_idx)
+        actual_landing_time.append(landing_time)
+        delay.append(d)
 
-            occupancy = runway_occupancy_time(flight["ROT"])
+    # -------------------------------
+    # 📦 Attach results to dataframe
+    # -------------------------------
+    flights["assigned_runway"] = assigned_runway
+    flights["actual_landing_time"] = actual_landing_time
+    flights["delay"] = delay
 
-            available_time = max(
-                runway_available_time[r],
-                flight["adjusted_eta"]
-            ) + separation + occupancy
+    # -------------------------------
+    # 📊 Performance Metrics
+    # -------------------------------
+    avg_delay = sum(delay) / len(delay)
+    max_delay = max(delay)
 
-            if available_time < best_time:
-                best_time = available_time
-                best_runway = r
+    print("\n📊 Scheduling Performance:")
+    print(f"➡️ Average Delay: {avg_delay:.2f} minutes")
+    print(f"➡️ Max Delay: {max_delay} minutes")
 
-        runway_available_time[best_runway] = best_time
-        previous_wake[best_runway] = "M"
-
-        scheduled_landings.append({
-            "callsign": flight["callsign"],
-            "runway": best_runway,
-            "landing_time": best_time,
-            "predicted_delay": flight["predicted_delay"]
-        })
-
-    return pd.DataFrame(scheduled_landings)
+    return flights
